@@ -1,0 +1,337 @@
+---
+title       : Slidify Demo
+subtitle    : This is  my Demo
+author      : Joe Thomas
+job         : Big Guy
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : []            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+knit        : slidify::knit2slides
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	fig.width = 14,
+	fig.height = 8
+)
+``` 
+
+## United States Data
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+library(Quandl)
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(rmarkdown)
+library(slidify)
+library(slidifyLibraries)
+library(ggthemes)
+library(kableExtra)
+library(ggplot2)
+library(reshape2)
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+recessions.df = read.table(textConnection(
+  "Peak, Trough
+  1948-11-01, 1949-10-01
+  1953-07-01, 1954-05-01
+  1957-08-01, 1958-04-01
+  1960-04-01, 1961-02-01
+  1969-12-01, 1970-11-01
+  1973-11-01, 1975-03-01
+  1980-01-01, 1980-07-01
+  1981-07-01, 1982-11-01
+  1990-07-01, 1991-03-01
+  2001-03-01, 2001-11-01
+  2007-12-01, 2009-06-01"), sep=',',
+  colClasses=c('Date', 'Date'), header=TRUE) 
+inflation <- Quandl("RATEINF/INFLATION_USA", api_key="fN8iNWKErmRzT_DrHJjt")
+current_cpi <- inflation$Value[1]
+cat(sprintf("Inflation Rate %s\n", round(current_cpi,2)))
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+mydata <- Quandl("FRED/GDPC1", api_key="fN8iNWKErmRzT_DrHJjt")
+current_gdp_growth <- ((mydata$Value[1] - mydata$Value[5])/mydata$Value[5]*100)
+cat(sprintf("GDP Growth %s\n", round(current_gdp_growth,2)))
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+unemployment <- Quandl("FRED/UNRATE")
+current_unemployment <- unemployment$Value[1]
+cat(sprintf("Unemployment Rate %s\n", current_unemployment))
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+ind_pro<-Quandl("FRED/INDPRO")
+ind_pro_cur <- ind_pro[1,2]
+ind_pro_yearago<- ind_pro[13,2]
+ind_pro_change<- ((ind_pro_cur - ind_pro_yearago)/ind_pro_yearago)*100
+cat(sprintf("Industrial Production %s\n", round(ind_pro_change,2)))
+```
+
+---
+
+<center>
+## Leading Economic Indicators:Predictors that generally (not always) change before the actual economy begins to change.
+<center>
+
+
+
+```{r, out.width="340px",fig.align="center", echo = FALSE, message = FALSE, warning = FALSE}
+knitr::include_graphics("economic_indicators.jpg")
+
+```
+
+---
+
+<center>
+## Average Weekly Hours of Production and Nonsupervisory Employees: Manufacturing
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+hours<-Quandl("FRED/AWHMAN")
+table_hours <- subset(hours,Date > "2014-12-01")
+table_hours$Date<-format(table_hours$Date, "%b-%Y")
+table_hours<-separate(table_hours, Date, into = c("Month", "Year"), sep = "-")
+my_hours <- melt(table_hours, id.vars=c("Month", "Year","Value"))
+my_hours <-dcast(my_hours, Month ~ Year)
+my_hours<- my_hours[order(match(my_hours$Month, month.abb)),]
+rownames(my_hours)<-NULL
+kable(my_hours,  "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+options(scipen = 5)
+today = Sys.Date()
+#Average Weekly Hours
+hours<-Quandl("FRED/AWHMAN")
+ggplot(data=hours, aes(x=Date, y = Value))+theme_economist() +geom_line(color = "royalblue", size = 1.5)+labs(y = "Hours",title = "Average Weekly Hours of Production and Nonsupervisory Employees: Manufacturing")+ theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+scale_y_continuous(limits = c(37.5,42.5), breaks =seq(37.5,42.5,0.5),sec.axis = dup_axis())+coord_cartesian(xlim=c(as.Date("1989-01-01"),today))+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Average weekly hours (manufacturing)** - Adjustments to the working hours of existing employees are usually made in advance of new hires or layoffs, which is why the measure of average weekly hours is a leading indicator for changes in unemployment.
+<center>
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+#Initial Claims
+claims<-Quandl("FRED/ICSA")
+ggplot(data=claims, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Claims", title = "Initial Claims")+theme(plot.title = element_text(hjust = 0.5, face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5) +coord_cartesian(xlim=c(as.Date("1989-01-01"),today))+scale_y_continuous(limits = c(100000,700000), breaks =seq(100000,700000,100000),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Average weekly jobless claims for unemployment insurance** - The CB reverses the value of this component from positive to negative because a positive reading indicates a loss in jobs. The initial jobless-claims data is more sensitive to business conditions than other measures of unemployment, and as such leads the monthly unemployment data released by the U.S. Department of Labor.
+<center>
+
+---
+
+<center>
+## Manufacturers' New Orders:Durable Goods
+#### Manufacturers New Orders: Durable Goods, Millions of Dollars, Monthly, Seasonally Adjusted
+<center>
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+Durable_Goods<-Quandl("FRED/DGORDER")
+table_durable_goods <- subset(Durable_Goods,Date > "2014-12-01")
+table_durable_goods$Date<-format(table_durable_goods$Date, "%b-%Y")
+table_durable_goods<-separate(table_durable_goods, Date, into = c("Month", "Year"), sep = "-")
+my_durable_goods <- melt(table_durable_goods, id.vars=c("Month", "Year","Value"))
+my_durable_goods <-dcast(my_durable_goods, Month ~ Year)
+my_durable_goods<- my_durable_goods[order(match(my_durable_goods$Month, month.abb)),]
+rownames(my_durable_goods)<-NULL
+kable(my_durable_goods, format.args = list(decimal.mark = ',', big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+#Durable Goods
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+Durable_Goods<-Quandl("FRED/DGORDER")
+ggplot(data= Durable_Goods, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Millions of Dollars", title = "Manufacturers' New Orders: Durable Goods")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1992-02-01"),today))+scale_y_continuous(limits = c(100000,300000), breaks =seq(100000,300000,20000),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
+<center>
+**Manufacturers' new orders for consumer goods/materials** - This component is considered a leading indicator because increases in new orders for consumer goods and materials usually mean positive changes in actual production. The new orders decrease inventory and contribute to unfilled orders, a precursor to future revenue.
+<center>
+
+---
+
+<center>
+## ISM Manufacturing Suppliers Delivery Index
+#### National Association of Purchasing Managers Supplier Deliveries Index
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+ISM<- read.csv("C:/Users/Joe/Documents/ism.csv")
+ISM$DATE<-as.Date(ISM$DATE)
+table_ism <- subset(ISM,DATE > "2014-12-01")
+table_ism$DATE<-format(table_ism$DATE, "%b-%Y")
+table_ism<-separate(table_ism, DATE, into = c("Month", "Year"), sep = "-")
+my_ism <- melt(table_ism, id.vars=c("Month", "Year","VALUE"))
+my_ism <-dcast(my_ism, Month ~ Year)
+my_ism<- my_ism[order(match(my_ism$Month, month.abb)),]
+rownames(my_ism)<-NULL
+kable(my_ism, "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 6.5}
+ggplot(data= ISM, aes(x=as.Date(DATE), y = VALUE))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(title = "ISM Manufacturing Suppliers Delivery Index", x = "Date", y = "Ratio")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1992-02-01"),today))+scale_y_continuous(limits = c(40,70), breaks =seq(40,70,5),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+ISM Manufacturing Suppliers Delivery Index - This component measures the time it takes to deliver orders to industrial companies. Vendor performance leads the business cycle because an increase in delivery time can indicate rising demand for manufacturing supplies. Vendor performance is measured by a monthly survey from the National Association of Purchasing Managers (NAPM). This diffusion index measures one-half of the respondents reporting no change and all respondents reporting slower deliveries.
+<center>
+
+---
+<center>
+## Manufacturers' New Orders 
+####  Nondefense Capital Goods Excluding Aircraft, Millions of Dollars, Monthly, Seasonally Adjusted
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+New_Goods<-Quandl("FRED/NEWORDER")
+table_New_goods <- subset(New_Goods,Date > "2014-12-01")
+table_New_goods$Date<-format(table_New_goods$Date, "%b-%Y")
+table_New_goods<-separate(table_New_goods, Date, into = c("Month", "Year"), sep = "-")
+my_New_goods <- melt(table_New_goods, id.vars=c("Month", "Year","Value"))
+my_New_goods <-dcast(my_New_goods, Month ~ Year)
+my_New_goods<- my_New_goods[order(match(my_New_goods$Month, month.abb)),]
+rownames(my_New_goods)<-NULL
+kable(my_New_goods, format.args = list(decimal.mark = ',', big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+ggplot(data= New_Goods, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Millions of Dollars", title = "Manufacturers New Orders - Non-Defense Ex Aircrafts")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1992-02-01"),today))+scale_y_continuous(limits = c(20000,80000), breaks =seq(20000,80000,10000),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Manufacturers' new orders for non-defense capital goods** - New orders lead the business cycle because increases in orders usually mean positive changes in actual production and perhaps rising demand. This measure is the producer's counterpart of new orders for consumer goods/materials component (#3).
+<center>
+
+---
+<center>
+## New Private Housing Units 
+#### Authorized by Building Permits Thousands of Units, Monthly, Seasonally Adjusted Annual Rate
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+Building_Permits<-Quandl("FRED/PERMIT")
+table_permits <- subset(Building_Permits,Date > "2014-12-01")
+table_permits$Date<-format(table_permits$Date, "%b-%Y")
+table_permits<-separate(table_permits, Date, into = c("Month", "Year"), sep = "-")
+my_permits <- melt(table_permits, id.vars=c("Month", "Year","Value"))
+my_permits <-dcast(my_permits, Month ~ Year)
+my_permits<- my_permits[order(match(my_permits$Month, month.abb)),]
+rownames(my_permits)<-NULL
+kable(my_permits, format.args = list(big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+Building_Permits<-Quandl("FRED/PERMIT")
+ggplot(data= Building_Permits, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Thousands of Units", title = "New Private Housing Units Authorized by Building Permits")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1992-02-01"),today))+scale_y_continuous(limits = c(400,2500), breaks =seq(400,2500,500),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Building permits** for new private housing units.
+<center>
+
+---
+
+<center>
+## Velocity of M2 Money Stock
+#### Calculated as the ratio of quarterly nominal GDP to the quarterly average of M2 money stock.
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+M2<- Quandl("FRED/M2V")
+table_M2 <- subset(M2,Date > "2014-12-01")
+table_M2$Date<-format(table_M2$Date, "%b-%Y")
+table_M2<-separate(table_M2, Date, into = c("Month", "Year"), sep = "-")
+my_M2 <- melt(table_M2, id.vars=c("Month", "Year","Value"))
+my_M2 <-dcast(my_M2, Month ~ Year)
+my_M2<- my_M2[order(match(my_M2$Month, month.abb)),]
+rownames(my_M2)<-NULL
+kable(my_M2, format.args = list(big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 6.5}
+ M2<- Quandl("FRED/M2V")
+ggplot(data= M2, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Ratio", title = "Velocity of M2 Money Stocks")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1989-01-01"),today))+scale_y_continuous(limits = c(1.4,2.3), breaks =seq(1.4,2.3,0.1),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Money Supply (M2)** - The money supply measures demand deposits, traveler's checks, savings deposits, currency, money market accounts, and small-denomination time deposits. Bank lending, a factor contributing to account deposits, usually declines when inflation increases faster than the money supply, which can make economic expansion more difficult. Thus, an increase in demand deposits will indicate expectations that inflation will rise, resulting in a decrease in bank lending and an increase in savings.
+<center>
+
+---
+<center>
+## 10-Year Treasury Minus Federal Funds Rate
+#### Calculated as the spread between 10-Year Treasury Constant Maturity and Effective Federal Funds Rate .
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+spread<- Quandl("FRED/T10YFFM")
+table_spread <- subset(spread,Date > "2014-12-01")
+table_spread$Date<-format(table_spread$Date, "%b-%Y")
+table_spread<-separate(table_spread, Date, into = c("Month", "Year"), sep = "-")
+my_spread <- melt(table_spread, id.vars=c("Month", "Year","Value"))
+my_spread <-dcast(my_spread, Month ~ Year)
+my_spread<- my_spread[order(match(my_spread$Month, month.abb)),]
+rownames(my_spread)<-NULL
+kable(my_spread, format.args = list(big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 6.5}
+spread<- Quandl("FRED/T10YFFM")
+ggplot(data= spread, aes(x=Date, y = Value))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Percent", title = "10-Year Treasury Constant Maturity Minus Federal Funds Rate")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1989-01-01"),today))+scale_y_continuous(limits = c(-2,5), breaks =seq(-2,4,2),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Interest rate spread (10-year Treasury vs. Federal Funds target)** - The interest rate spread is often referred to as the yield curve and implies the expected direction of short-, medium- and long-term interest rates. Changes in the yield curve have been the most accurate predictors of downturns in the economic cycle. This is particularly true when the curve becomes inverted, that is, when the longer-term returns are expected to be less than the short rates.
+<center>
+
+---
+<center>
+## University of Michigan: Consumer Sentiment
+<center>
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Quandl.api_key("fN8iNWKErmRzT_DrHJjt")
+consumer_confidence<-read.csv("C:/Users/Joe/Documents/consumer_confidence.csv")
+consumer_confidence$DATE<-as.Date(consumer_confidence$DATE)
+table_confidence <- subset(consumer_confidence,DATE > "2014-12-01")
+table_confidence$DATE<-format(table_confidence$DATE, "%b-%Y")
+table_confidence<-separate(table_confidence, DATE, into = c("Month", "Year"), sep = "-")
+my_confidence <- melt(table_confidence, id.vars=c("Month", "Year","VALUE"))
+my_confidence <-dcast(my_confidence, Month ~ Year)
+my_confidence<- my_confidence[order(match(my_confidence$Month, month.abb)),]
+rownames(my_confidence)<-NULL
+kable(my_confidence, format.args = list(big.mark = ","), "html")%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 14, fig.height = 7}
+consumer_confidence<-read.csv("C:/Users/Joe/Documents/consumer_confidence.csv")
+today <- Sys.Date()
+ggplot(data= consumer_confidence, aes(x=as.Date(DATE), y = VALUE))+theme_economist()+geom_line(color = "royalblue", size = 1.5)+labs(y = "Level", x = "Date",title = "Consumer Sentiment")+theme(plot.title = element_text(hjust = 0.5,face = "bold", size = "16"))+geom_rect(data=recessions.df, inherit.aes=F, aes(xmin=Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "darkgray", alpha =0.5)+coord_cartesian(xlim=c(as.Date("1989-01-01"),today))+scale_y_continuous(limits = c(40,120), breaks =seq(40,120,20),sec.axis = dup_axis())+scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+<center>
+**Index of consumer expectations** - This is the only component of the leading indicators that is based solely on expectations. This component leads the business cycle because consumer expectations can indicate future consumer spending or tightening. The data for this component comes from the University of Michigan's Survey Research Center, and is released once a month.
+<center>
